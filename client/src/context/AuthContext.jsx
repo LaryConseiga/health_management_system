@@ -3,6 +3,8 @@ import axios from 'axios';
 
 const AuthContext = createContext();
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
@@ -20,22 +22,22 @@ export const AuthProvider = ({ children }) => {
 
     const login = async (username, password) => {
         try {
-            const res = await axios.post('http://localhost:5000/api/auth/login', { username, password });
+            const res = await axios.post(`${API_BASE_URL}/api/auth/login`, { username, password });
             localStorage.setItem('token', res.data.token);
             localStorage.setItem('user', JSON.stringify(res.data.user));
             setUser(res.data.user);
             return { success: true };
         } catch (err) {
-            return { success: false, error: err.response?.data?.message || 'Login failed' };
+            return { success: false, error: err.response?.data?.message || err.response?.data?.error || 'Login failed' };
         }
     };
 
     const register = async (username, password, name, role) => {
         try {
-            await axios.post('http://localhost:5000/api/auth/register', { username, password, name, role });
+            await axios.post(`${API_BASE_URL}/api/auth/register`, { username, password, name, role });
             return { success: true };
         } catch (err) {
-            return { success: false, error: err.response?.data?.message || 'Registration failed' };
+            return { success: false, error: err.response?.data?.message || err.response?.data?.error || 'Registration failed' };
         }
     };
 

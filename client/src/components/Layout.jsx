@@ -44,10 +44,12 @@ const Layout = () => {
                         <Calendar className="w-5 h-5 mr-3" />
                         Appointments
                     </NavLink>
-                    <NavLink to="/billing" className={navLinkClasses}>
-                        <Receipt className="w-5 h-5 mr-3" />
-                        Billing
-                    </NavLink>
+                    {user?.role !== 'doctor' && (
+                        <NavLink to="/billing" className={navLinkClasses}>
+                            <Receipt className="w-5 h-5 mr-3" />
+                            Billing
+                        </NavLink>
+                    )}
                 </nav>
 
                 <div className="p-4 border-t border-slate-700">

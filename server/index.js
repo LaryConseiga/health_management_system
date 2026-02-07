@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const helmet = require('helmet');
 const dotenv = require('dotenv');
+const path = require('path');
 
 dotenv.config();
 
@@ -12,6 +13,9 @@ const app = express();
 app.use(express.json());
 app.use(cors());
 app.use(helmet());
+
+// Servir les fichiers uploads de manière statique
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Database Connection
 const connectDB = async () => {

@@ -7,7 +7,7 @@ import {
     Users, Calendar, Receipt, Activity,
     UserPlus, CalendarPlus, FileText,
     TrendingUp, Clock, CheckCircle,
-    ArrowRight
+    ArrowRight, Stethoscope, Edit3, X
 } from 'lucide-react';
 
 const API_URL = 'http://localhost:5000/api';
@@ -23,25 +23,43 @@ const Dashboard = () => {
     const [recentPatients, setRecentPatients] = useState([]);
     const [upcomingAppointments, setUpcomingAppointments] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [showConsultationModal, setShowConsultationModal] = useState(false);
+    const [selectedPatientForConsultation, setSelectedPatientForConsultation] = useState(null);
+    const [consultationForm, setConsultationForm] = useState({
+        notes: '',
+        diagnosis: '',
+        prescription: '',
+        followUpDate: ''
+    });
 
     useEffect(() => {
-        fetchDashboardData();
-    }, []);
+        if (user) {
+            fetchDashboardData();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [user]);
 
     const fetchDashboardData = async () => {
         try {
             const token = localStorage.getItem('token');
             const headers = { Authorization: `Bearer ${token}` };
 
-            const [patientsRes, appointmentsRes, billingRes] = await Promise.all([
+            // Ne pas charger billing si c'est un docteur
+            const isDoctor = user?.role === 'doctor';
+            
+            const requests = [
                 axios.get(`${API_URL}/patients`, { headers }),
-                axios.get(`${API_URL}/appointments`, { headers }),
-                axios.get(`${API_URL}/billing`, { headers })
-            ]);
+                axios.get(`${API_URL}/appointments`, { headers })
+            ];
 
-            const patients = patientsRes.data;
-            const appointments = appointmentsRes.data;
-            const invoices = billingRes.data;
+            if (!isDoctor) {
+                requests.push(axios.get(`${API_URL}/billing`, { headers }));
+            }
+
+            const results = await Promise.all(requests);
+            const patients = results[0].data;
+            const appointments = results[1].data;
+            const invoices = isDoctor ? [] : results[2].data;
 
             // Calculate stats
             const today = new Date().toDateString();
@@ -75,18 +93,71 @@ const Dashboard = () => {
         }
     };
 
-    const statCards = [
+    // Filtrer les statCards selon le rôle
+    const allStatCards = [
         { label: 'Total Patients', value: stats.totalPatients, icon: Users, color: 'blue', link: '/patients' },
         { label: "Today's Appointments", value: stats.todayAppointments, icon: Calendar, color: 'purple', link: '/appointments' },
-        { label: 'Pending Invoices', value: stats.pendingInvoices, icon: Receipt, color: 'yellow', link: '/billing' },
+        { label: 'Pending Invoices', value: stats.pendingInvoices, icon: Receipt, color: 'yellow', link: '/billing', roles: ['admin', 'staff'] },
         { label: 'Completed Visits', value: stats.completedAppointments, icon: CheckCircle, color: 'green', link: '/appointments' }
     ];
 
-    const quickActions = [
+    const statCards = allStatCards.filter(card => {
+        if (card.roles) {
+            return card.roles.includes(user?.role);
+        }
+        return true;
+    });
+
+    // Filtrer les quickActions selon le rôle
+    const allQuickActions = [
         { label: 'Add Patient', icon: UserPlus, link: '/patients', color: 'blue' },
         { label: 'Schedule Appointment', icon: CalendarPlus, link: '/appointments', color: 'purple' },
-        { label: 'Create Invoice', icon: FileText, link: '/billing', color: 'green' }
+        { label: 'Create Invoice', icon: FileText, link: '/billing', color: 'green', roles: ['admin', 'staff'] }
     ];
+
+    const quickActions = allQuickActions.filter(action => {
+        if (action.roles) {
+            return action.roles.includes(user?.role);
+        }
+        return true;
+    });
+
+    const handleOpenConsultationModal = (patient) => {
+        setSelectedPatientForConsultation(patient);
+        setConsultationForm({
+            notes: '',
+            diagnosis: '',
+            prescription: '',
+            followUpDate: ''
+        });
+        setShowConsultationModal(true);
+    };
+
+    const handleSubmitConsultation = async (e) => {
+        e.preventDefault();
+        if (!selectedPatientForConsultation || !consultationForm.notes.trim()) {
+            alert('Veuillez remplir au moins les notes de consultation');
+            return;
+        }
+
+        try {
+            const token = localStorage.getItem('token');
+            await axios.post(
+                `${API_URL}/patients/${selectedPatientForConsultation._id}/consultation-notes`,
+                consultationForm,
+                {
+                    headers: { Authorization: `Bearer ${token}` }
+                }
+            );
+            alert('Notes de consultation ajoutées avec succès');
+            setShowConsultationModal(false);
+            setSelectedPatientForConsultation(null);
+            fetchDashboardData(); // Rafraîchir les données
+        } catch (err) {
+            console.error('Error adding consultation notes:', err);
+            alert('Erreur lors de l\'ajout des notes: ' + (err.response?.data?.error || err.response?.data?.message || err.message));
+        }
+    };
 
     const getColorClasses = (color) => {
         const colors = {
@@ -131,8 +202,8 @@ const Dashboard = () => {
                 </div>
             </motion.div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Stats Grid - Ajuster le nombre de colonnes selon le rôle */}
+            <div className={`grid grid-cols-1 sm:grid-cols-2 ${user?.role === 'doctor' ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4`}>
                 {statCards.map((stat, index) => {
                     const Icon = stat.icon;
                     return (
@@ -172,7 +243,7 @@ const Dashboard = () => {
                 className="bg-white rounded-xl shadow p-6"
             >
                 <h2 className="text-lg font-semibold text-gray-800 mb-4">Quick Actions</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className={`grid grid-cols-1 ${user?.role === 'doctor' ? 'sm:grid-cols-2' : 'sm:grid-cols-3'} gap-4`}>
                     {quickActions.map((action) => {
                         const Icon = action.icon;
                         return (
@@ -238,7 +309,7 @@ const Dashboard = () => {
                     )}
                 </motion.div>
 
-                {/* Recent Patients */}
+                {/* Recent Patients - Avec bouton consultation pour docteur */}
                 <motion.div
                     initial={{ opacity: 0, x: 20 }}
                     animate={{ opacity: 1, x: 0 }}
@@ -260,7 +331,7 @@ const Dashboard = () => {
                             {recentPatients.map((patient) => (
                                 <div
                                     key={patient._id}
-                                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg"
+                                    className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors"
                                 >
                                     <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                                         <span className="text-blue-600 font-semibold">
@@ -271,13 +342,130 @@ const Dashboard = () => {
                                         <p className="font-medium text-gray-900 truncate">{patient.name}</p>
                                         <p className="text-sm text-gray-500">{patient.contact}</p>
                                     </div>
-                                    <span className="text-sm text-gray-500">{patient.age} yrs</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-sm text-gray-500">{patient.age} yrs</span>
+                                        {user?.role === 'doctor' && (
+                                            <button
+                                                onClick={() => handleOpenConsultationModal(patient)}
+                                                className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                title="Ajouter notes de consultation"
+                                            >
+                                                <Stethoscope className="w-4 h-4" />
+                                            </button>
+                                        )}
+                                    </div>
                                 </div>
                             ))}
                         </div>
                     )}
                 </motion.div>
             </div>
+
+            {/* Modal pour notes de consultation (Docteur uniquement) */}
+            {showConsultationModal && selectedPatientForConsultation && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+                    onClick={() => setShowConsultationModal(false)}
+                >
+                    <motion.div
+                        initial={{ scale: 0.95, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 0.95, opacity: 0 }}
+                        className="bg-white rounded-xl shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto"
+                        onClick={(e) => e.stopPropagation()}
+                    >
+                        <div className="flex items-center justify-between mb-6">
+                            <div>
+                                <h3 className="text-xl font-bold text-gray-800">
+                                    Notes de Consultation
+                                </h3>
+                                <p className="text-sm text-gray-500 mt-1">
+                                    Patient: {selectedPatientForConsultation.name}
+                                </p>
+                            </div>
+                            <button 
+                                onClick={() => setShowConsultationModal(false)} 
+                                className="p-2 hover:bg-gray-100 rounded-lg"
+                            >
+                                <X className="w-5 h-5" />
+                            </button>
+                        </div>
+
+                        <form onSubmit={handleSubmitConsultation} className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Notes de consultation *
+                                </label>
+                                <textarea
+                                    required
+                                    value={consultationForm.notes}
+                                    onChange={(e) => setConsultationForm({ ...consultationForm, notes: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                                    rows="4"
+                                    placeholder="Décrivez la consultation, les symptômes, les observations..."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Diagnostic
+                                </label>
+                                <input
+                                    type="text"
+                                    value={consultationForm.diagnosis}
+                                    onChange={(e) => setConsultationForm({ ...consultationForm, diagnosis: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                                    placeholder="Diagnostic posé..."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Prescription
+                                </label>
+                                <textarea
+                                    value={consultationForm.prescription}
+                                    onChange={(e) => setConsultationForm({ ...consultationForm, prescription: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                                    rows="3"
+                                    placeholder="Médicaments prescrits, posologie..."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Date de suivi (optionnel)
+                                </label>
+                                <input
+                                    type="date"
+                                    value={consultationForm.followUpDate}
+                                    onChange={(e) => setConsultationForm({ ...consultationForm, followUpDate: e.target.value })}
+                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                                />
+                            </div>
+
+                            <div className="flex gap-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setShowConsultationModal(false)}
+                                    className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                                >
+                                    Annuler
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                >
+                                    Enregistrer les notes
+                                </button>
+                            </div>
+                        </form>
+                    </motion.div>
+                </motion.div>
+            )}
         </div>
     );
 };

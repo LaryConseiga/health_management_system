@@ -1,6 +1,9 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Login from './pages/Login';
+import Acceuil from './pages/Acceuil';
+import About from './pages/About';
+import Contact from './pages/Contact';
 import Register from './pages/Register';
 import Layout from './components/Layout';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -11,9 +14,14 @@ import Billing from './pages/Billing';
 
 function App() {
     return (
+        
         <AuthProvider>
             <Router>
                 <Routes>
+                    <Route path="/Acceuil" element={<Acceuil />} />
+                    <Route path="/About" element={<About />} />
+                    <Route path="/Contact" element={<Contact />} />
+
                     <Route path="/login" element={<Login />} />
                     <Route path="/register" element={<Register />} />
 
@@ -26,7 +34,7 @@ function App() {
                         </Route>
                     </Route>
 
-                    <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                     <Route path="/" element={<Acceuil />} />
                 </Routes>
             </Router>
         </AuthProvider>

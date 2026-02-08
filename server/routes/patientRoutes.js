@@ -6,6 +6,9 @@ const upload = require('../middleware/uploadMiddleware');
 
 router.use(verifyToken);
 
+// Route pour que le patient récupère ses propres informations
+router.get('/my-info', authorizeRoles('patient'), patientController.getMyInfo);
+
 router.post('/',
     authorizeRoles('admin', 'doctor', 'staff'),
     upload.array('documents', 10), // Permet jusqu'à 10 fichiers avec le nom de champ 'documents'

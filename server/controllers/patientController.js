@@ -190,3 +190,13 @@ exports.deletePatient = async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 };
+
+exports.getMyInfo = async (req, res) => {
+    try {
+        const patient = await Patient.findOne({ user: req.user.id }).populate('consultationNotes.doctor', 'name');
+        if (!patient) return res.status(404).json({ message: 'Patient record not found' });
+        res.json(patient);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+};

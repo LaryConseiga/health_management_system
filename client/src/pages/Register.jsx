@@ -7,7 +7,8 @@ const Register = () => {
         name: '',
         username: '',
         password: '',
-        role: 'staff'
+        role: 'staff',
+        specialty: ''
     });
     const [error, setError] = useState('');
     const { register } = useAuth();
@@ -23,7 +24,8 @@ const Register = () => {
             formData.username,
             formData.password,
             formData.name,
-            formData.role
+            formData.role,
+            formData.specialty
         );
         if (res.success) {
             navigate('/login');
@@ -148,11 +150,37 @@ const Register = () => {
                                 onChange={handleChange}
                                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                             >
+                                <option value="patient">Patient</option>
                                 <option value="staff">Staff</option>
                                 <option value="doctor">Doctor</option>
                                 <option value="admin">Admin</option>
                             </select>
                         </div>
+
+                        {formData.role === 'doctor' && (
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                                    Specialty
+                                </label>
+                                <select
+                                    name="specialty"
+                                    value={formData.specialty}
+                                    onChange={handleChange}
+                                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
+                                    required={formData.role === 'doctor'}
+                                >
+                                    <option value="">Select a specialty</option>
+                                    <option value="Cardiology">Cardiology</option>
+                                    <option value="Dermatology">Dermatology</option>
+                                    <option value="Neurology">Neurology</option>
+                                    <option value="Orthopedics">Orthopedics</option>
+                                    <option value="Pediatrics">Pediatrics</option>
+                                    <option value="Psychiatry">Psychiatry</option>
+                                    <option value="General Practice">General Practice</option>
+                                    <option value="Surgery">Surgery</option>
+                                </select>
+                            </div>
+                        )}
 
                         <button
                             type="submit"

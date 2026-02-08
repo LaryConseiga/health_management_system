@@ -4,6 +4,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const dotenv = require('dotenv');
 const path = require('path');
+const { MongoMemoryServer } = require('mongodb-memory-server');
 
 dotenv.config();
 
@@ -18,17 +19,26 @@ app.use(helmet());
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Database Connection
+let mongoServer;
+
 const connectDB = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/hms_db');
-    console.log('MongoDB Connected');
+    // Pour le développement, utiliser MongoDB en mémoire
+    if (process.env.NODE_ENV !== 'production') {
+      mongoServer = await MongoMemoryServer.create();
+      const mongoUri = mongoServer.getUri();
+      await mongoose.connect(mongoUri);
+      console.log('MongoDB (Memory) Connected');
+    } else {
+      // En production, utiliser la connexion Atlas
+      await mongoose.connect(process.env.MONGO_URI || 'mongodb://localhost:27017/hms_db');
+      console.log('MongoDB Connected');
+    }
   } catch (err) {
     console.error('MongoDB Connection Error:', err.message);
     process.exit(1);
   }
 };
-
-connectDB();
 
 // Routes
 app.use('/api/auth', require('./routes/authRoutes'));
@@ -42,6 +52,16 @@ app.get('/', (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+const startServer = async () => {
+  try {
+    await connectDB();
+    app.listen(PORT, () => {
+      console.log(`Server running on port ${PORT}`);
+    });
+  } catch (err) {
+    console.error('Failed to start server:', err.message);
+    process.exit(1);
+  }
+};
+
+startServer();

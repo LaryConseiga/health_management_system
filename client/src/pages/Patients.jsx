@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { UserPlus, X, Edit2, Trash2, Search, Users } from 'lucide-react';
+import { UserPlus, X, Edit2, Trash2, Search, Users, FileText, Download, Upload } from 'lucide-react';
 
 const API_URL = 'http://localhost:5000/api';
 
@@ -9,8 +9,12 @@ const Patients = () => {
     const [patients, setPatients] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showModal, setShowModal] = useState(false);
+    const [showDocumentModal, setShowDocumentModal] = useState(false);
+    const [documentPatient, setDocumentPatient] = useState(null);
     const [editingPatient, setEditingPatient] = useState(null);
     const [searchTerm, setSearchTerm] = useState('');
+    const [selectedFiles, setSelectedFiles] = useState([]);
+    const [selectedDocuments, setSelectedDocuments] = useState([]);
     const [formData, setFormData] = useState({
         name: '',
         age: '',
@@ -38,30 +42,110 @@ const Patients = () => {
         }
     };
 
+    const handleFileChange = (e) => {
+        const files = Array.from(e.target.files);
+        // Filtrer pour n'accepter que PDF, JPEG, PNG
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+        const validFiles = files.filter(file => allowedTypes.includes(file.type));
+        if (validFiles.length !== files.length) {
+            alert('Seuls les fichiers PDF, JPEG et PNG sont autorisés');
+        }
+        setSelectedFiles(validFiles);
+    };
+
+    const handleDocumentFileChange = (e) => {
+        const files = Array.from(e.target.files);
+        // Filtrer pour n'accepter que PDF, JPEG, PNG
+        const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+        const validFiles = files.filter(file => allowedTypes.includes(file.type));
+        if (validFiles.length !== files.length) {
+            alert('Seuls les fichiers PDF, JPEG et PNG sont autorisés');
+        }
+        setSelectedDocuments(validFiles);
+    };
+
+    const openDocumentModal = (patient) => {
+        setDocumentPatient(patient);
+        setSelectedDocuments([]);
+        setShowDocumentModal(true);
+    };
+
+    const closeDocumentModal = () => {
+        setShowDocumentModal(false);
+        setDocumentPatient(null);
+        setSelectedDocuments([]);
+    };
+
+    const handleAddDocuments = async (e) => {
+        e.preventDefault();
+        if (!documentPatient || selectedDocuments.length === 0) {
+            alert('Veuillez sélectionner au moins un fichier');
+            return;
+        }
+
+        const token = localStorage.getItem('token');
+        const formDataToSend = new FormData();
+
+        // Ajouter les fichiers
+        selectedDocuments.forEach((file) => {
+            formDataToSend.append('documents', file);
+        });
+
+        try {
+            await axios.post(`${API_URL}/patients/${documentPatient._id}/documents`, formDataToSend, {
+                headers: {
+                    Authorization: `Bearer ${token}`,
+                    'Content-Type': 'multipart/form-data'
+                }
+            });
+            fetchPatients();
+            closeDocumentModal();
+            alert('Documents ajoutés avec succès');
+        } catch (err) {
+            console.error('Error adding documents:', err);
+            alert('Erreur lors de l\'ajout des documents: ' + (err.response?.data?.error || err.response?.data?.message || err.message));
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         const token = localStorage.getItem('token');
-        const payload = {
-            ...formData,
-            age: parseInt(formData.age),
-            medicalHistory: formData.medicalHistory.split(',').map(s => s.trim()).filter(Boolean)
-        };
+
+        // Créer FormData pour envoyer les fichiers
+        const formDataToSend = new FormData();
+        formDataToSend.append('name', formData.name);
+        formDataToSend.append('age', formData.age);
+        formDataToSend.append('gender', formData.gender);
+        formDataToSend.append('contact', formData.contact);
+        formDataToSend.append('address', formData.address || '');
+        formDataToSend.append('medicalHistory', formData.medicalHistory || '');
+
+        // Ajouter les fichiers
+        selectedFiles.forEach((file) => {
+            formDataToSend.append('documents', file);
+        });
 
         try {
             if (editingPatient) {
-                await axios.put(`${API_URL}/patients/${editingPatient._id}`, payload, {
-                    headers: { Authorization: `Bearer ${token}` }
+                await axios.put(`${API_URL}/patients/${editingPatient._id}`, formDataToSend, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'multipart/form-data'
+                    }
                 });
             } else {
-                await axios.post(`${API_URL}/patients`, payload, {
-                    headers: { Authorization: `Bearer ${token}` }
+                await axios.post(`${API_URL}/patients`, formDataToSend, {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                        'Content-Type': 'multipart/form-data'
+                    }
                 });
             }
             fetchPatients();
             closeModal();
         } catch (err) {
             console.error('Error saving patient:', err);
-            alert('Error saving patient: ' + (err.response?.data?.error || err.message));
+            alert('Error saving patient: ' + (err.response?.data?.error || err.response?.data?.message || err.message));
         }
     };
 
@@ -94,6 +178,7 @@ const Patients = () => {
     const closeModal = () => {
         setShowModal(false);
         setEditingPatient(null);
+        setSelectedFiles([]);
         setFormData({ name: '', age: '', gender: 'Male', contact: '', address: '', medicalHistory: '' });
     };
 
@@ -149,6 +234,7 @@ const Patients = () => {
                                 <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Age</th>
                                 <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Gender</th>
                                 <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Contact</th>
+                                <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Documents</th>
                                 <th className="px-6 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">Actions</th>
                             </tr>
                         </thead>
@@ -165,16 +251,46 @@ const Patients = () => {
                                     <td className="px-6 py-4 whitespace-nowrap text-gray-600">{patient.gender}</td>
                                     <td className="px-6 py-4 whitespace-nowrap text-gray-600">{patient.contact}</td>
                                     <td className="px-6 py-4 whitespace-nowrap">
+                                        {patient.documents && patient.documents.length > 0 ? (
+                                            <div className="flex flex-wrap gap-2">
+                                                {patient.documents.map((doc, idx) => (
+                                                    <a
+                                                        key={idx}
+                                                        href={`http://localhost:5000${doc.path}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded hover:bg-blue-200 transition-colors"
+                                                        title={doc.originalName}
+                                                    >
+                                                        <FileText className="w-3 h-3" />
+                                                        <span className="max-w-[100px] truncate">{doc.originalName}</span>
+                                                    </a>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <span className="text-gray-400 text-sm">Aucun document</span>
+                                        )}
+                                    </td>
+                                    <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => openEditModal(patient)}
                                                 className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                                                title="Modifier"
                                             >
                                                 <Edit2 className="w-4 h-4" />
                                             </button>
                                             <button
+                                                onClick={() => openDocumentModal(patient)}
+                                                className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                                title="Ajouter des documents"
+                                            >
+                                                <Upload className="w-4 h-4" />
+                                            </button>
+                                            <button
                                                 onClick={() => handleDelete(patient._id)}
                                                 className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                                title="Supprimer"
                                             >
                                                 <Trash2 className="w-4 h-4" />
                                             </button>
@@ -285,6 +401,32 @@ const Patients = () => {
                                     />
                                 </div>
 
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Documents (PDF, JPEG, PNG) - Max 10MB par fichier
+                                    </label>
+                                    <input
+                                        type="file"
+                                        multiple
+                                        accept=".pdf,.jpg,.jpeg,.png"
+                                        onChange={handleFileChange}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                                    />
+                                    {selectedFiles.length > 0 && (
+                                        <div className="mt-2 space-y-1">
+                                            {selectedFiles.map((file, index) => (
+                                                <div key={index} className="text-sm text-gray-600 flex items-center gap-2">
+                                                    <FileText className="w-4 h-4" />
+                                                    <span>{file.name}</span>
+                                                    <span className="text-gray-400">
+                                                        ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
                                 <div className="flex gap-3 pt-4">
                                     <button
                                         type="button"
@@ -298,6 +440,97 @@ const Patients = () => {
                                         className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                                     >
                                         {editingPatient ? 'Update' : 'Add Patient'}
+                                    </button>
+                                </div>
+                            </form>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* Modal pour ajouter des documents */}
+            <AnimatePresence>
+                {showDocumentModal && documentPatient && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
+                        onClick={closeDocumentModal}
+                    >
+                        <motion.div
+                            initial={{ scale: 0.95, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 0.95, opacity: 0 }}
+                            className="bg-white rounded-xl shadow-xl max-w-md w-full p-6"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-xl font-bold text-gray-800">
+                                    Ajouter des documents - {documentPatient.name}
+                                </h3>
+                                <button onClick={closeDocumentModal} className="p-2 hover:bg-gray-100 rounded-lg">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+
+                            <form onSubmit={handleAddDocuments} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                                        Documents (PDF, JPEG, PNG) - Max 10MB par fichier
+                                    </label>
+                                    <input
+                                        type="file"
+                                        multiple
+                                        accept=".pdf,.jpg,.jpeg,.png"
+                                        onChange={handleDocumentFileChange}
+                                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500"
+                                        required
+                                    />
+                                    {selectedDocuments.length > 0 && (
+                                        <div className="mt-2 space-y-1">
+                                            {selectedDocuments.map((file, index) => (
+                                                <div key={index} className="text-sm text-gray-600 flex items-center gap-2">
+                                                    <FileText className="w-4 h-4" />
+                                                    <span>{file.name}</span>
+                                                    <span className="text-gray-400">
+                                                        ({(file.size / 1024 / 1024).toFixed(2)} MB)
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+
+                                {documentPatient.documents && documentPatient.documents.length > 0 && (
+                                    <div>
+                                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                                            Documents existants ({documentPatient.documents.length})
+                                        </label>
+                                        <div className="max-h-32 overflow-y-auto space-y-1 p-2 bg-gray-50 rounded-lg">
+                                            {documentPatient.documents.map((doc, idx) => (
+                                                <div key={idx} className="text-xs text-gray-600 flex items-center gap-2">
+                                                    <FileText className="w-3 h-3" />
+                                                    <span className="truncate">{doc.originalName}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                <div className="flex gap-3 pt-4">
+                                    <button
+                                        type="button"
+                                        onClick={closeDocumentModal}
+                                        className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                                    >
+                                        Annuler
+                                    </button>
+                                    <button
+                                        type="submit"
+                                        className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                    >
+                                        Ajouter les documents
                                     </button>
                                 </div>
                             </form>

@@ -32,9 +32,9 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const register = async (username, password, name, role) => {
+    const register = async (username, password, name, role, specialty = null) => {
         try {
-            await axios.post(`${API_BASE_URL}/api/auth/register`, { username, password, name, role });
+            await axios.post(`${API_BASE_URL}/api/auth/register`, { username, password, name, role, specialty });
             return { success: true };
         } catch (err) {
             return { success: false, error: err.response?.data?.message || err.response?.data?.error || 'Registration failed' };
